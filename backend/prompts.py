@@ -156,6 +156,82 @@ For each vulnerability:
 
 Repository: {repo_name}
 Files:
+{file_contents}""",
+
+    "code_smells": """You are a code quality expert specializing in anti-patterns and code smells. Perform a granular analysis of every file.
+
+Detect these specific code smells:
+
+1. **God Classes** - Classes >300 lines or >10 methods. List class name, file, line count.
+2. **Long Methods** - Functions >50 lines. List function name, file, line count.
+3. **Duplicate Code** - Similar code blocks across files. Show both snippets.
+4. **Magic Numbers** - Hardcoded numeric literals without named constants. List each occurrence.
+5. **Deep Nesting** - Code nested >4 levels deep. List file and line range.
+6. **Complex Conditionals** - if/else chains >4 conditions. List each occurrence.
+7. **Dead Code** - Unreferenced functions/variables. List each one.
+8. **Feature Envy** - Methods that use other classes' data more than their own.
+9. **Switch Statements** - Switch/case with >5 cases (replace with polymorphism).
+10. **Lazy Classes** - Classes with <3 methods or <20 lines.
+
+For EACH smell found:
+- Type of smell
+- File path and line range
+- Code snippet (current)
+- Severity (Critical/High/Medium/Low)
+- How to fix it (suggestion)
+
+Group results by file. Be thorough — scan every file.
+
+Repository: {repo_name}
+Files:
+{file_contents}""",
+
+    "migration": """You are a senior software engineer specializing in framework migrations. Analyze the codebase and generate a complete migration guide.
+
+Target framework: {target_framework}
+
+For each file that needs changes:
+1. **File path** - Which file needs migration
+2. **Current code** - The code that needs to change
+3. **Migrated code** - The equivalent code in the target framework
+4. **Explanation** - Why this change is needed
+
+Also provide:
+- **Migration Overview** - High-level summary of all changes needed
+- **Dependency Changes** - What packages to remove/add (old → new)
+- **Breaking Changes** - List all breaking changes with workarounds
+- **Step-by-step Guide** - Ordered migration steps
+- **Testing Checklist** - What to verify after migration
+
+Be thorough — cover every file that needs changes. Provide complete code, not snippets.
+
+Repository: {repo_name}
+Files:
+{file_contents}""",
+
+    "test_gaps": """You are a test engineer specializing in test coverage analysis. Analyze the codebase to find untested functions and generate test cases.
+
+First, identify:
+1. **Test Files** - Find all test files (test_*.py, *.test.ts, *.spec.ts, *_test.go, etc.)
+2. **Source Files** - Find all non-test source files
+3. **Test Coverage Gaps** - Functions/classes that have NO corresponding test
+
+For each untested function:
+- File path and function name
+- Function signature
+- Why it should be tested (complexity, risk, public API)
+- Suggested test case with code (use the project's test framework)
+
+Also provide:
+- **Coverage Summary** - X/Y functions tested (Z% coverage)
+- **Critical Gaps** - Most important functions to test first
+- **Test Framework Detection** - Which test framework the project uses (pytest, jest, go test, etc.)
+- **Missing Test Infrastructure** - If no tests exist, suggest how to set up testing
+
+Generate actual test code for the top 5 most critical untested functions.
+
+Repository: {repo_name}
+Files:
 {file_contents}"""
 }
 
@@ -166,5 +242,6 @@ ANALYSIS_TYPES = {
     "architecture": "Architecture Diagram",
     "documentation": "Documentation Generation",
     "refactoring": "Refactoring Suggestions",
-    "security": "Security Analysis"
+    "security": "Security Analysis",
+    "code_smells": "Code Smell Detector"
 }

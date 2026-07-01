@@ -6,16 +6,24 @@ import RepoInput from "@/components/RepoInput";
 import RepoInfoCard from "@/components/RepoInfoCard";
 import AnalysisTabs from "@/components/AnalysisTabs";
 import AnalysisResult from "@/components/AnalysisResult";
-import FileTree from "@/components/FileTree";
+import FileComplexityHeatmap from "@/components/FileComplexityHeatmap";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import { fetchRepo, analyzeCodeStream, analyzeBatch } from "@/lib/api";
-import { FetchRepoResponse, AnalysisType, ANALYSIS_LABELS } from "@/types";
+import { fetchRepo, analyzeCodeStream, analyzeBatch, fetchComplexity } from "@/lib/api";
+import { FetchRepoResponse, AnalysisType, ANALYSIS_LABELS, ComplexityResponse, FileComplexity } from "@/types";
 import ExportButtons from "@/components/ExportButtons";
 import ShareButtons from "@/components/ShareButtons";
 import MobileFileDrawer from "@/components/MobileFileDrawer";
 import { saveToHistory } from "@/components/HistoryPanel";
-import { AlertCircle, ArrowLeft, Keyboard } from "lucide-react";
+import { AlertCircle, ArrowLeft, Keyboard, MessageSquare, BarChart3, ArrowRightLeft, FlaskConical, Users, Bell, Code, Folder } from "lucide-react";
 import ShortcutsModal from "@/components/ShortcutsModal";
+import ChatPanel from "@/components/ChatPanel";
+import RepoTimeline from "@/components/RepoTimeline";
+import MigrationAssistant from "@/components/MigrationAssistant";
+import TestCoverageGapFinder from "@/components/TestCoverageGapFinder";
+import ContributorInsights from "@/components/ContributorInsights";
+import WebhookSettings from "@/components/WebhookSettings";
+import APIDocs from "@/components/APIDocs";
+import TeamWorkspaces from "@/components/TeamWorkspaces";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import ErrorCard from "@/components/ErrorCard";
 
@@ -70,7 +78,7 @@ function AnalyzeContent() {
   const [repoUrl, setRepoUrl] = useState(urlParam);
   const [repoData, setRepoData] = useState<FetchRepoResponse | null>(null);
   const [activeTab, setActiveTab] = useState<AnalysisType>(
-    tabParam && ["code_explain", "bug_detection", "readme_improve", "architecture", "documentation", "refactoring", "security"].includes(tabParam)
+    tabParam && ["code_explain", "bug_detection", "readme_improve", "architecture", "documentation", "refactoring", "security", "code_smells"].includes(tabParam)
       ? tabParam
       : "code_explain"
   );
@@ -86,12 +94,22 @@ function AnalyzeContent() {
   const [isRunningAll, setIsRunningAll] = useState(false);
   const [runAllProgress, setRunAllProgress] = useState({ done: 0, total: 0 });
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [showMigration, setShowMigration] = useState(false);
+  const [showTestGaps, setShowTestGaps] = useState(false);
+  const [showContributors, setShowContributors] = useState(false);
+  const [showWebhook, setShowWebhook] = useState(false);
+  const [showAPI, setShowAPI] = useState(false);
+  const [showWorkspaces, setShowWorkspaces] = useState(false);
+  const [complexityData, setComplexityData] = useState<ComplexityResponse | null>(null);
+  const [selectedHeatmapFile, setSelectedHeatmapFile] = useState<string | null>(null);
   const streamingContentRef = useRef("");
   const analysisContentRef = useRef<HTMLDivElement>(null);
 
   const allTabs: AnalysisType[] = [
     "code_explain", "bug_detection", "readme_improve",
-    "architecture", "documentation", "refactoring", "security"
+    "architecture", "documentation", "refactoring", "security", "code_smells"
   ];
 
   const classifyError = (err: string): { message: string; type: "error" | "network" | "rate-limit" | "timeout" } => {
@@ -143,6 +161,8 @@ function AnalyzeContent() {
     try {
       const data = await fetchRepo(url);
       setRepoData(data);
+
+      fetchComplexity(url).then((c) => setComplexityData(c)).catch(() => {});
 
       const cached = loadFromStorage(url);
       if (cached && Object.keys(cached.results).length > 0) {
@@ -226,7 +246,7 @@ function AnalyzeContent() {
 
     const allTypes: AnalysisType[] = [
       "code_explain", "bug_detection", "readme_improve",
-      "architecture", "documentation", "refactoring", "security"
+      "architecture", "documentation", "refactoring", "security", "code_smells"
     ];
 
     const pending = allTypes.filter((t) => !results[t]);
@@ -271,6 +291,8 @@ function AnalyzeContent() {
     setStreamStatus("");
     setError(null);
     setRestoredFromCache(false);
+    setComplexityData(null);
+    setSelectedHeatmapFile(null);
     router.push(`/analyze?url=${encodeURIComponent(url)}&tab=code_explain`);
   };
 
@@ -283,6 +305,14 @@ function AnalyzeContent() {
   return (
     <div className="min-h-screen">
       <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      {repoData && (
+        <ChatPanel
+          repoUrl={repoUrl}
+          repoName={repoData.repo_info.full_name}
+          isOpen={showChat}
+          onClose={() => setShowChat(false)}
+        />
+      )}
       <main className="flex flex-col">
         {!repoData && !loading && !error && (
           <div className="flex-1 flex flex-col items-center justify-center px-4 py-20">
@@ -334,9 +364,123 @@ function AnalyzeContent() {
                   New Analysis
                 </button>
                 <RepoInfoCard info={repoData.repo_info} />
-                {restoredFromCache && (
-                  <div className="mt-2 text-xs text-emerald-500">
-                    Results restored from previous session ({completedAnalyses.size} analyses cached)
+                <div className="mt-2 flex items-center gap-3">
+                  <button
+                    onClick={() => setShowTimeline(!showTimeline)}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      showTimeline
+                        ? "bg-emerald-600/20 text-emerald-400"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                    }`}
+                  >
+                    <BarChart3 className="w-3 h-3" />
+                    Timeline
+                  </button>
+                  <button
+                    onClick={() => setShowMigration(!showMigration)}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      showMigration
+                        ? "bg-orange-600/20 text-orange-400"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                    }`}
+                  >
+                    <ArrowRightLeft className="w-3 h-3" />
+                    Migrate
+                  </button>
+                  <button
+                    onClick={() => setShowTestGaps(!showTestGaps)}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      showTestGaps
+                        ? "bg-cyan-600/20 text-cyan-400"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                    }`}
+                  >
+                    <FlaskConical className="w-3 h-3" />
+                    Test Gaps
+                  </button>
+                  <button
+                    onClick={() => setShowContributors(!showContributors)}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      showContributors
+                        ? "bg-blue-600/20 text-blue-400"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                    }`}
+                  >
+                    <Users className="w-3 h-3" />
+                    Contributors
+                  </button>
+                  <button
+                    onClick={() => setShowWebhook(!showWebhook)}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      showWebhook
+                        ? "bg-yellow-600/20 text-yellow-400"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                    }`}
+                  >
+                    <Bell className="w-3 h-3" />
+                    Webhook
+                  </button>
+                  <button
+                    onClick={() => setShowAPI(!showAPI)}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      showAPI
+                        ? "bg-green-600/20 text-green-400"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                    }`}
+                  >
+                    <Code className="w-3 h-3" />
+                    API
+                  </button>
+                  <button
+                    onClick={() => setShowWorkspaces(!showWorkspaces)}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      showWorkspaces
+                        ? "bg-indigo-600/20 text-indigo-400"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                    }`}
+                  >
+                    <Folder className="w-3 h-3" />
+                    Teams
+                  </button>
+                  {restoredFromCache && (
+                    <div className="text-xs text-emerald-500">
+                      Results restored from previous session ({completedAnalyses.size} analyses cached)
+                    </div>
+                  )}
+                </div>
+                {showTimeline && (
+                  <div className="mt-4">
+                    <RepoTimeline repoUrl={repoUrl} />
+                  </div>
+                )}
+                {showMigration && (
+                  <div className="mt-4">
+                    <MigrationAssistant repoUrl={repoUrl} repoName={repoData.repo_info.full_name} />
+                  </div>
+                )}
+                {showTestGaps && (
+                  <div className="mt-4">
+                    <TestCoverageGapFinder repoUrl={repoUrl} />
+                  </div>
+                )}
+                {showContributors && (
+                  <div className="mt-4">
+                    <ContributorInsights repoUrl={repoUrl} />
+                  </div>
+                )}
+                {showWebhook && (
+                  <div className="mt-4">
+                    <WebhookSettings repoUrl={repoUrl} repoName={repoData.repo_info.full_name} />
+                  </div>
+                )}
+                {showAPI && (
+                  <div className="mt-4">
+                    <APIDocs />
+                  </div>
+                )}
+                {showWorkspaces && (
+                  <div className="mt-4">
+                    <TeamWorkspaces />
                   </div>
                 )}
                 <div className="mt-4">
@@ -368,7 +512,12 @@ function AnalyzeContent() {
               <div className="flex gap-6">
                 <div className="hidden lg:block w-64 shrink-0">
                   <div className="sticky top-24">
-                    <FileTree files={repoData.file_tree} />
+                    <FileComplexityHeatmap
+                      files={repoData.file_tree}
+                      complexityData={complexityData?.files || null}
+                      onSelectFile={setSelectedHeatmapFile}
+                      selectedFile={selectedHeatmapFile}
+                    />
                   </div>
                 </div>
                 <MobileFileDrawer files={repoData.file_tree} />
@@ -385,6 +534,15 @@ function AnalyzeContent() {
                           title="Keyboard shortcuts (?)"
                         >
                           <Keyboard className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setShowChat(!showChat)}
+                          className={`p-2 transition-colors rounded-lg ${
+                            showChat ? "text-violet-400 bg-violet-600/10" : "text-zinc-500 hover:text-white hover:bg-zinc-800"
+                          }`}
+                          title="Chat with Repo"
+                        >
+                          <MessageSquare className="w-4 h-4" />
                         </button>
                         {analyzing && (
                           <span className="text-xs text-violet-400 animate-pulse">

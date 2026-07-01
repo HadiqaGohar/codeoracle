@@ -59,7 +59,8 @@ export type AnalysisType =
   | "architecture"
   | "documentation"
   | "refactoring"
-  | "security";
+  | "security"
+  | "code_smells";
 
 export const ANALYSIS_LABELS: Record<AnalysisType, string> = {
   code_explain: "Code Explanation",
@@ -69,6 +70,7 @@ export const ANALYSIS_LABELS: Record<AnalysisType, string> = {
   documentation: "Documentation",
   refactoring: "Refactoring",
   security: "Security Analysis",
+  code_smells: "Code Smells",
 };
 
 export const ANALYSIS_ICONS: Record<AnalysisType, string> = {
@@ -79,4 +81,32 @@ export const ANALYSIS_ICONS: Record<AnalysisType, string> = {
   documentation: "BookOpen",
   refactoring: "Wrench",
   security: "Shield",
+  code_smells: "AlertTriangle",
 };
+
+export interface FileComplexity {
+  score: number;
+  level: "minimal" | "low" | "medium" | "high";
+  color: string;
+  metrics: {
+    lines: number;
+    functions: number;
+    classes: number;
+    max_nesting: number;
+    magic_numbers: number;
+    imports: number;
+    comment_ratio: number;
+  };
+}
+
+export interface ComplexityResponse {
+  files: Record<string, FileComplexity>;
+  average_score: number;
+  total_files: number;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+}

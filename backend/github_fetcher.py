@@ -184,3 +184,107 @@ async def fetch_repository(repo_url: str) -> dict:
         "total_files": len(filtered_files),
         "fetched_files": len(file_contents)
     }
+
+
+async def fetch_repo_timeline(owner: str, repo: str) -> dict:
+    async with httpx.AsyncClient(timeout=30) as client:
+        commit_resp = await client.get(
+            f"{GITHUB_API}/repos/{owner}/{repo}/stats/commit_activity",
+            headers=get_headers()
+        )
+        commit_activity = commit_resp.json() if commit_resp.status_code == 200 else []
+
+        contrib_resp = await client.get(
+            f"{GITHUB_API}/repos/{owner}/{repo}/stats/contributors",
+            headers=get_headers()
+        )
+        contributors = []
+        if contrib_resp.status_code == 200:
+            raw_contribs = contrib_resp.json()
+            if isinstance(raw_contribs, list):
+                for c in raw_contribs[:15]:
+                    contributors.append({
+                        "login": c.get("author", {}).get("login", ""),
+                        "avatar_url": c.get("author", {}).get("avatar_url", ""),
+                        "total_commits": c.get("total", 0),
+                        "weekly_commits": [w.get("c", 0) for w in c.get("weeks", [])[-12:]],
+                    })
+
+        participation_resp = await client.get(
+            f"{GITHUB_API}/repos/{owner}/{repo}/stats/participation",
+            headers=get_headers()
+        )
+        participation = {}
+        if participation_resp.status_code == 200:
+            p_data = participation_resp.json()
+            if "all" in p_data:
+                participation = {
+                    "weekly_all": p_data["all"][-12:],
+                    "weekly_owner": p_data.get("owner", [])[-12:],
+                }
+
+        code_freq_resp = await client.get(
+            f"{GITHUB_API}/repos/{owner}/{repo}/stats/code_frequency",
+            headers=get_headers()
+        )
+        code_frequency = []
+        if code_freq_resp.status_code == 200:
+            raw_freq = code_freq_resp.json()
+            if isinstance(raw_freq, list):
+                code_frequency = [{"week": f[0], "additions": f[1], "deletions": f[2]} for f in raw_freq[-12:]]
+
+        return {
+            "commit_activity": commit_activity[-52:] if isinstance(commit_activity, list) else [],
+            "contributors": contributors,
+            "participation": participation,
+            "code_frequency": code_frequency,
+        }
+
+
+def calculate_bus_factor(contributors: list) -> dict:
+    if not contributors:
+        return {"bus_factor": 0, "risk_level": "unknown", "top_contributors": []}
+
+    total_commits = sum(c["total_commits"] for c in contributors)
+    if total_commits == 0:
+        return {"bus_factor": 0, "risk_level": "unknown", "top_contributors": []}
+
+    bus_factor = 0
+    cumulative = 0
+    for c in contributors:
+        cumulative += c["total_commits"]
+        bus_factor += 1
+        if cumulative >= total_commits * 0.5:
+            break
+
+    if bus_factor <= 1:
+        risk = "critical"
+    elif bus_factor <= 2:
+        risk = "high"
+    elif bus_factor <= 3:
+        risk = "medium"
+    else:
+        risk = "low"
+
+    top = []
+    for c in contributors[:5]:
+        percentage = round(c["total_commits"] / total_commits * 100, 1) if total_commits > 0 else 0
+        top.append({
+            "login": c["login"],
+            "avatar_url": c["avatar_url"],
+            "total_commits": c["total_commits"],
+            "percentage": percentage,
+        })
+
+    return {
+        "bus_factor": bus_factor,
+        "risk_level": risk,
+        "total_commits": total_commits,
+        "total_contributors": len(contributors),
+        "top_contributors": top,
+    }
+
+
+async def fetch_repo_timeline_data(repo_url: str) -> dict:
+    owner, repo = parse_repo_url(repo_url)
+    return await fetch_repo_timeline(owner, repo)

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from typing import List
 
-from github_fetcher import fetch_repository
+from github_fetcher import fetch_repository, fetch_repo_timeline_data
 from gemini_analyzer import analyze_code
 from prompts import ANALYSIS_TYPES, ANALYSIS_PROMPTS
 from cache import get_cache, set_cache, clear_cache, cache_key
@@ -44,6 +44,45 @@ class AnalyzeRequest(BaseModel):
 class BatchAnalyzeRequest(BaseModel):
     repo_url: str
     analysis_types: List[str]
+
+
+class ChatRequest(BaseModel):
+    repo_url: str
+    message: str
+    history: List[dict] = []
+
+
+class MigrationRequest(BaseModel):
+    repo_url: str
+    target_framework: str
+
+
+class WebhookRequest(BaseModel):
+    webhook_url: str
+    repo_url: str
+    analysis_type: str = "full"
+
+
+class APIKeyRequest(BaseModel):
+    owner: str
+
+
+class WorkspaceRequest(BaseModel):
+    name: str
+    owner: str
+
+
+class WorkspaceMemberRequest(BaseModel):
+    workspace_id: str
+    member: str
+
+
+class WorkspaceAnalysisRequest(BaseModel):
+    workspace_id: str
+    repo_url: str
+    analysis_type: str
+    result: str
+    author: str
 
 
 def make_repo_key(repo_url: str) -> str:
@@ -252,6 +291,204 @@ async def analyze_stream(request: AnalyzeRequest):
             "X-Accel-Buffering": "no",
         }
     )
+
+
+@app.post("/api/complexity")
+async def complexity_analysis(request: RepoRequest):
+    try:
+        key = make_repo_key(request.repo_url)
+        repo_data = get_cache(key)
+        if not repo_data:
+            repo_data = await fetch_repository(request.repo_url)
+            set_cache(key, repo_data)
+
+        from complexity_scorer import analyze_repo_complexity
+        result = analyze_repo_complexity(repo_data["file_contents"])
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Complexity analysis failed: {str(e)}")
+
+
+@app.post("/api/chat")
+async def chat_with_repo(request: ChatRequest):
+    try:
+        key = make_repo_key(request.repo_url)
+        repo_data = get_cache(key)
+        if not repo_data:
+            repo_data = await fetch_repository(request.repo_url)
+            set_cache(key, repo_data)
+
+        file_contents = repo_data["file_contents"]
+        repo_name = repo_data["repo_info"]["full_name"]
+
+        formatted_files = []
+        for path, content in file_contents.items():
+            if isinstance(content, str):
+                formatted_files.append(f"\n--- FILE: {path} ---\n{content[:3000]}\n--- END FILE ---\n")
+        files_text = "\n".join(formatted_files[:30])
+
+        system_prompt = f"""You are CodeOracle AI, an expert code assistant. You have access to the repository "{repo_name}".
+
+Here are the repository files:
+{files_text}
+
+Answer the user's questions about this codebase accurately. Reference specific files and line numbers when possible. Be concise and helpful."""
+
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in request.history[-10:]:
+            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+        messages.append({"role": "user", "content": request.message})
+
+        from gemini_analyzer import get_openrouter_client, MODEL_NAME
+        client = get_openrouter_client()
+        response = await client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2048,
+        )
+
+        reply = response.choices[0].message.content if response.choices and response.choices[0].message.content else "No response generated."
+        return {"response": reply}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
+
+@app.post("/api/timeline")
+async def repo_timeline(request: RepoRequest):
+    try:
+        result = await fetch_repo_timeline_data(request.repo_url)
+        from github_fetcher import calculate_bus_factor
+        result["bus_factor"] = calculate_bus_factor(result.get("contributors", []))
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Timeline fetch failed: {str(e)}")
+
+
+@app.post("/api/migrate")
+async def migrate_code(request: MigrationRequest):
+    try:
+        key = make_repo_key(request.repo_url)
+        repo_data = get_cache(key)
+        if not repo_data:
+            repo_data = await fetch_repository(request.repo_url)
+            set_cache(key, repo_data)
+
+        from gemini_analyzer import build_prompt, call_openrouter
+        from prompts import ANALYSIS_PROMPTS
+
+        formatted_files = []
+        for path, content in repo_data["file_contents"].items():
+            if isinstance(content, str):
+                formatted_files.append(f"\n--- FILE: {path} ---\n{content}\n--- END FILE ---\n")
+        files_text = "\n".join(formatted_files)
+
+        prompt = ANALYSIS_PROMPTS["migration"].format(
+            repo_name=repo_data["repo_info"]["full_name"],
+            file_contents=files_text,
+            target_framework=request.target_framework,
+        )
+
+        result = await call_openrouter(prompt)
+        return {"result": result, "target_framework": request.target_framework}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Migration analysis failed: {str(e)}")
+
+
+@app.post("/api/test-gaps")
+async def test_coverage_gaps(request: RepoRequest):
+    try:
+        key = make_repo_key(request.repo_url)
+        repo_data = get_cache(key)
+        if not repo_data:
+            repo_data = await fetch_repository(request.repo_url)
+            set_cache(key, repo_data)
+
+        from gemini_analyzer import call_openrouter
+        from prompts import ANALYSIS_PROMPTS
+
+        formatted_files = []
+        for path, content in repo_data["file_contents"].items():
+            if isinstance(content, str):
+                formatted_files.append(f"\n--- FILE: {path} ---\n{content}\n--- END FILE ---\n")
+        files_text = "\n".join(formatted_files)
+
+        prompt = ANALYSIS_PROMPTS["test_gaps"].format(
+            repo_name=repo_data["repo_info"]["full_name"],
+            file_contents=files_text,
+        )
+
+        result = await call_openrouter(prompt)
+        return {"result": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Test gap analysis failed: {str(e)}")
+
+
+@app.post("/api/webhook/register")
+async def register_webhook(request: WebhookRequest):
+    try:
+        from webhooks import send_webhook
+        await send_webhook(request.webhook_url, request.repo_url, "Test")
+        return {"status": "ok", "message": "Webhook registered and test notification sent"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Webhook registration failed: {str(e)}")
+
+
+@app.post("/api/api-keys/generate")
+async def generate_key(request: APIKeyRequest):
+    from api_keys import generate_api_key
+    key = generate_api_key(request.owner)
+    return {"api_key": key, "owner": request.owner}
+
+
+@app.get("/api/api-keys/stats/{key}")
+async def key_stats(key: str):
+    from api_keys import get_api_stats
+    stats = get_api_stats(key)
+    if not stats:
+        raise HTTPException(status_code=404, detail="API key not found")
+    return stats
+
+
+@app.post("/api/workspaces/create")
+async def create_ws(request: WorkspaceRequest):
+    from workspaces import create_workspace
+    ws = create_workspace(request.name, request.owner)
+    return ws
+
+
+@app.get("/api/workspaces/{owner}")
+async def list_ws(owner: str):
+    from workspaces import list_workspaces
+    return list_workspaces(owner)
+
+
+@app.get("/api/workspaces/{ws_id}/analyses")
+async def ws_analyses(ws_id: str):
+    from workspaces import get_analyses
+    analyses = get_analyses(ws_id)
+    if not analyses:
+        raise HTTPException(status_code=404, detail="Workspace not found or empty")
+    return {"analyses": analyses}
+
+
+@app.post("/api/workspaces/add-member")
+async def ws_add_member(request: WorkspaceMemberRequest):
+    from workspaces import add_member
+    ok = add_member(request.workspace_id, request.member)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return {"status": "ok"}
 
 
 @app.post("/api/cache/clear")

@@ -1,4 +1,4 @@
-import { FetchRepoResponse, AnalyzeResponse, BatchAnalyzeResponse, HealthResponse, AnalysisType } from "@/types";
+import { FetchRepoResponse, AnalyzeResponse, BatchAnalyzeResponse, HealthResponse, AnalysisType, ComplexityResponse, ChatMessage } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -103,5 +103,63 @@ export async function analyzeBatch(
 
 export async function checkHealth(): Promise<HealthResponse> {
   const res = await fetch(`${API_URL}/api/health`);
+  return res.json();
+}
+
+export async function fetchComplexity(repoUrl: string): Promise<ComplexityResponse> {
+  const res = await fetch(`${API_URL}/api/complexity`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repo_url: repoUrl }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Complexity analysis failed");
+  }
+  return res.json();
+}
+
+export async function chatWithRepo(
+  repoUrl: string,
+  message: string,
+  history: ChatMessage[]
+): Promise<string> {
+  const res = await fetch(`${API_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repo_url: repoUrl, message, history }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Chat failed");
+  }
+  const data = await res.json();
+  return data.response;
+}
+
+export interface TimelineData {
+  commit_activity: { week: number; commits: number }[];
+  contributors: { login: string; avatar_url: string; total_commits: number; weekly_commits: number[] }[];
+  participation: { weekly_all: number[]; weekly_owner: number[] };
+  code_frequency: { week: number; additions: number; deletions: number }[];
+  bus_factor: {
+    bus_factor: number;
+    risk_level: "critical" | "high" | "medium" | "low" | "unknown";
+    total_commits: number;
+    total_contributors: number;
+    top_contributors: { login: string; avatar_url: string; total_commits: number; percentage: number }[];
+  };
+}
+
+export async function fetchTimeline(repoUrl: string): Promise<TimelineData> {
+  const res = await fetch(`${API_URL}/api/timeline`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repo_url: repoUrl }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Timeline fetch failed");
+  }
   return res.json();
 }

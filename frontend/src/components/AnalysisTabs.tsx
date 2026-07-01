@@ -9,6 +9,7 @@ import {
   BookOpen,
   Wrench,
   Shield,
+  AlertTriangle,
   Play,
   Loader2,
 } from "lucide-react";
@@ -22,6 +23,7 @@ const ICONS: Record<AnalysisType, React.ElementType> = {
   documentation: BookOpen,
   refactoring: Wrench,
   security: Shield,
+  code_smells: AlertTriangle,
 };
 
 interface AnalysisTabsProps {
@@ -47,6 +49,7 @@ export default function AnalysisTabs({
     "documentation",
     "refactoring",
     "security",
+    "code_smells",
   ];
 
   const allCompleted = tabs.every((t) => completedAnalyses.has(t));
