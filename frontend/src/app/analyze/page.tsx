@@ -11,6 +11,7 @@ import FileTree from "@/components/FileTree";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { fetchRepo, analyzeCodeStream } from "@/lib/api";
 import { FetchRepoResponse, AnalysisType, ANALYSIS_LABELS } from "@/types";
+import ExportButtons from "@/components/ExportButtons";
 import { AlertCircle, ArrowLeft } from "lucide-react";
 
 const STORAGE_PREFIX = "repo-analysis-";
@@ -239,11 +240,19 @@ function AnalyzeContent() {
                       <h2 className="text-xl font-bold text-white">
                         {ANALYSIS_LABELS[activeTab]}
                       </h2>
-                      {analyzing && (
-                        <span className="text-xs text-violet-400 animate-pulse">
-                          Streaming...
-                        </span>
-                      )}
+                      <div className="flex items-center gap-3">
+                        {analyzing && (
+                          <span className="text-xs text-violet-400 animate-pulse">
+                            Streaming...
+                          </span>
+                        )}
+                        {results[activeTab] && !analyzing && (
+                          <ExportButtons
+                            content={results[activeTab]}
+                            filename={`${repoData?.repo_info?.name || "repo"}-${activeTab}`}
+                          />
+                        )}
+                      </div>
                     </div>
                     {analyzing === activeTab ? (
                       <div>
