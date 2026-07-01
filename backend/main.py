@@ -18,8 +18,8 @@ load_dotenv()
 
 app = FastAPI(
     title="AI Repository Analyzer API",
-    description="Analyze GitHub repositories using Google Gemini AI",
-    version="1.2.0"
+    description="Analyze GitHub repositories using AI via OpenRouter",
+    version="1.3.0"
 )
 
 app.add_middleware(
@@ -58,12 +58,14 @@ def make_analysis_key(repo_url: str, analysis_type: str) -> str:
 
 @app.get("/api/health")
 async def health_check():
-    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
     github_token = os.getenv("GITHUB_TOKEN", "")
+    model_name = os.getenv("MODEL_NAME", "google/gemini-2.5-flash-preview")
     return {
         "status": "ok",
-        "version": "1.2.0",
-        "gemini_configured": bool(gemini_key and gemini_key != "your_gemini_api_key_here"),
+        "version": "1.3.0",
+        "ai_configured": bool(openrouter_key),
+        "model": model_name,
         "github_configured": bool(github_token and github_token != "your_github_token_here"),
         "available_analyses": list(ANALYSIS_TYPES.keys())
     }
@@ -198,11 +200,11 @@ async def analyze_stream(request: AnalyzeRequest):
 
         yield f"data: {json.dumps({'status': 'analyzing', 'repo': repo_data['repo_info']['full_name']})}\n\n"
 
-        from gemini_analyzer import configure_gemini, format_file_contents
+        from gemini_analyzer import get_client, format_file_contents
         from prompts import ANALYSIS_PROMPTS as prompts
-        import google.generativeai as genai
 
-        configure_gemini()
+        client = get_client()
+        model_name = os.getenv("MODEL_NAME", "google/gemini-2.5-flash-preview")
         prompt_template = prompts[request.analysis_type]
         formatted_files = format_file_contents(repo_data["file_contents"])
         readme_content = repo_data["file_contents"].get("README.md", "No README found.")
@@ -219,16 +221,17 @@ async def analyze_stream(request: AnalyzeRequest):
                 file_contents=formatted_files
             )
 
-        model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash",
-            generation_config=genai.GenerationConfig(temperature=0.3, max_output_tokens=8192)
-        )
-
         try:
-            stream = await model.generate_content_async(prompt, stream=True)
+            stream = await client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=8192,
+                stream=True,
+            )
             async for chunk in stream:
-                if chunk.text:
-                    yield f"data: {json.dumps({'chunk': chunk.text})}\n\n"
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield f"data: {json.dumps({'chunk': chunk.choices[0].delta.content})}\n\n"
             yield f"data: {json.dumps({'status': 'done'})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"

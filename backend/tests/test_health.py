@@ -8,7 +8,8 @@ def test_health_check(client):
     data = response.json()
     assert data["status"] == "ok"
     assert "version" in data
-    assert "gemini_configured" in data
+    assert "ai_configured" in data
+    assert "model" in data
     assert "github_configured" in data
     assert "available_analyses" in data
 
