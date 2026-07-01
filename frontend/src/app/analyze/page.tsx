@@ -11,6 +11,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { fetchRepo, analyzeCodeStream, analyzeBatch } from "@/lib/api";
 import { FetchRepoResponse, AnalysisType, ANALYSIS_LABELS } from "@/types";
 import ExportButtons from "@/components/ExportButtons";
+import ShareButtons from "@/components/ShareButtons";
 import MobileFileDrawer from "@/components/MobileFileDrawer";
 import { saveToHistory } from "@/components/HistoryPanel";
 import { AlertCircle, ArrowLeft, Keyboard } from "lucide-react";
@@ -54,10 +55,15 @@ function AnalyzeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlParam = searchParams.get("url") || "";
+  const tabParam = searchParams.get("tab") as AnalysisType | null;
 
   const [repoUrl, setRepoUrl] = useState(urlParam);
   const [repoData, setRepoData] = useState<FetchRepoResponse | null>(null);
-  const [activeTab, setActiveTab] = useState<AnalysisType>("code_explain");
+  const [activeTab, setActiveTab] = useState<AnalysisType>(
+    tabParam && ["code_explain", "bug_detection", "readme_improve", "architecture", "documentation", "refactoring", "security"].includes(tabParam)
+      ? tabParam
+      : "code_explain"
+  );
   const [results, setResults] = useState<Record<AnalysisType, string>>({} as Record<AnalysisType, string>);
   const [completedAnalyses, setCompletedAnalyses] = useState<Set<AnalysisType>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -70,6 +76,7 @@ function AnalyzeContent() {
   const [runAllProgress, setRunAllProgress] = useState({ done: 0, total: 0 });
   const [showShortcuts, setShowShortcuts] = useState(false);
   const streamingContentRef = useRef("");
+  const analysisContentRef = useRef<HTMLDivElement>(null);
 
   const allTabs: AnalysisType[] = [
     "code_explain", "bug_detection", "readme_improve",
@@ -179,6 +186,7 @@ function AnalyzeContent() {
 
   const handleTabChange = (type: AnalysisType) => {
     setActiveTab(type);
+    router.replace(`/analyze?url=${encodeURIComponent(repoUrl)}&tab=${type}`, { scroll: false });
     if (!results[type] && !analyzing) {
       handleAnalyze(type);
     }
@@ -234,7 +242,7 @@ function AnalyzeContent() {
     setStreamStatus("");
     setError(null);
     setRestoredFromCache(false);
-    router.push(`/analyze?url=${encodeURIComponent(url)}`);
+    router.push(`/analyze?url=${encodeURIComponent(url)}&tab=code_explain`);
   };
 
   const getStatusMessage = () => {
@@ -355,10 +363,18 @@ function AnalyzeContent() {
                           </span>
                         )}
                         {results[activeTab] && !analyzing && (
-                          <ExportButtons
-                            content={results[activeTab]}
-                            filename={`${repoData?.repo_info?.name || "repo"}-${activeTab}`}
-                          />
+                          <>
+                            <ShareButtons
+                              shareUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/analyze?url=${encodeURIComponent(repoUrl)}&tab=${activeTab}`}
+                              repoName={repoData?.repo_info?.full_name || "repository"}
+                              analysisType={ANALYSIS_LABELS[activeTab]}
+                            />
+                            <ExportButtons
+                              content={results[activeTab]}
+                              filename={`${repoData?.repo_info?.name || "repo"}-${activeTab}`}
+                              contentRef={analysisContentRef}
+                            />
+                          </>
                         )}
                       </div>
                     </div>
@@ -371,7 +387,9 @@ function AnalyzeContent() {
                         )}
                       </div>
                     ) : results[activeTab] ? (
-                      <AnalysisResult content={results[activeTab]} />
+                      <div ref={analysisContentRef}>
+                        <AnalysisResult content={results[activeTab]} />
+                      </div>
                     ) : (
                       <div className="text-center py-12 text-zinc-500">
                         Click the analysis tab to start
