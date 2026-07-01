@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import RepoInput from "@/components/RepoInput";
 import RepoInfoCard from "@/components/RepoInfoCard";
@@ -13,7 +13,9 @@ import { FetchRepoResponse, AnalysisType, ANALYSIS_LABELS } from "@/types";
 import ExportButtons from "@/components/ExportButtons";
 import MobileFileDrawer from "@/components/MobileFileDrawer";
 import { saveToHistory } from "@/components/HistoryPanel";
-import { AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft, Keyboard } from "lucide-react";
+import ShortcutsModal from "@/components/ShortcutsModal";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const STORAGE_PREFIX = "repo-analysis-";
 
@@ -65,6 +67,32 @@ function AnalyzeContent() {
   const [restoredFromCache, setRestoredFromCache] = useState(false);
   const [isRunningAll, setIsRunningAll] = useState(false);
   const [runAllProgress, setRunAllProgress] = useState({ done: 0, total: 0 });
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  const allTabs: AnalysisType[] = [
+    "code_explain", "bug_detection", "readme_improve",
+    "architecture", "documentation", "refactoring", "security"
+  ];
+
+  const keyboardHandlers = useMemo(() => ({
+    onFocusSearch: () => {
+      const input = document.querySelector<HTMLInputElement>('input[type="text"]');
+      input?.focus();
+    },
+    onSwitchTab: (index: number) => {
+      if (allTabs[index]) {
+        handleTabChange(allTabs[index]);
+      }
+    },
+    onRunAnalysis: () => {
+      if (repoUrl && !analyzing && !results[activeTab]) {
+        handleAnalyze(activeTab);
+      }
+    },
+    onToggleHelp: () => setShowShortcuts((v) => !v),
+  }), [activeTab, analyzing, repoUrl, results]);
+
+  useKeyboardShortcuts(keyboardHandlers);
 
   const loadRepo = useCallback(async (url: string) => {
     if (!url) return;
@@ -227,6 +255,7 @@ function AnalyzeContent() {
 
   return (
     <div className="min-h-screen">
+      <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
       <main className="flex flex-col">
         {!repoData && !loading && !error && (
           <div className="flex-1 flex flex-col items-center justify-center px-4 py-20">
@@ -320,6 +349,13 @@ function AnalyzeContent() {
                         {ANALYSIS_LABELS[activeTab]}
                       </h2>
                       <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setShowShortcuts(true)}
+                          className="p-2 text-zinc-500 hover:text-white transition-colors rounded-lg hover:bg-zinc-800"
+                          title="Keyboard shortcuts (?)"
+                        >
+                          <Keyboard className="w-4 h-4" />
+                        </button>
                         {analyzing && (
                           <span className="text-xs text-violet-400 animate-pulse">
                             Streaming...
