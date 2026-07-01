@@ -101,6 +101,12 @@ function AnalyzeContent() {
         type: "rate-limit",
       };
     }
+    if (err.includes("402") || err.includes("too large") || err.includes("token")) {
+      return {
+        message: "Repository is too large for the AI model. Try a smaller repository.",
+        type: "rate-limit",
+      };
+    }
     if (err.includes("timeout") || err.includes("TIMEOUT")) {
       return { message: "Request timed out. The repository may be too large.", type: "timeout" };
     }

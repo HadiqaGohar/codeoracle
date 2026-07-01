@@ -45,12 +45,18 @@ async def analyze_code(repo_name: str, file_contents: dict, analysis_type: str) 
             file_contents=formatted_files
         )
 
-    response = await client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-        max_tokens=8192,
-    )
+    try:
+        response = await client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=8192,
+        )
+    except Exception as e:
+        err_str = str(e)
+        if "402" in err_str or "tokens" in err_str.lower() or "limit" in err_str.lower():
+            raise ValueError("Repository is too large for the AI model's token limit. Try a smaller repository.")
+        raise
 
     if response.choices and response.choices[0].message.content:
         return response.choices[0].message.content

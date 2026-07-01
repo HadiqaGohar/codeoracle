@@ -234,7 +234,11 @@ async def analyze_stream(request: AnalyzeRequest):
                     yield f"data: {json.dumps({'chunk': chunk.choices[0].delta.content})}\n\n"
             yield f"data: {json.dumps({'status': 'done'})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            err_str = str(e)
+            if "402" in err_str or "tokens" in err_str.lower() or "limit" in err_str.lower():
+                yield f"data: {json.dumps({'error': 'Repository is too large for the AI model. Try a smaller repository or fewer files.'})}\n\n"
+            else:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(
         event_generator(),

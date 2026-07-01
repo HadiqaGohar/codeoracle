@@ -19,6 +19,7 @@ IGNORED_EXTENSIONS = {
 }
 
 MAX_FILE_SIZE = 100_000
+MAX_TOTAL_CHARS = 200_000
 
 
 def get_headers() -> dict:
@@ -146,7 +147,7 @@ async def fetch_repository(repo_url: str) -> dict:
 
     filtered_files.sort(key=lambda x: x.get("size", 0), reverse=True)
 
-    files_to_fetch = filtered_files[:50]
+    files_to_fetch = filtered_files[:30]
 
     semaphore = asyncio.Semaphore(10)
 
@@ -157,12 +158,16 @@ async def fetch_repository(repo_url: str) -> dict:
             return path, content
 
     file_contents = {}
+    total_chars = 0
     async with httpx.AsyncClient(timeout=30) as client:
         tasks = [fetch_with_semaphore(client, fi) for fi in files_to_fetch]
         results = await asyncio.gather(*tasks)
         for path, content in results:
             if content and len(content) < MAX_FILE_SIZE:
+                if total_chars + len(content) > MAX_TOTAL_CHARS:
+                    break
                 file_contents[path] = content
+                total_chars += len(content)
 
     file_tree = []
     for item in filtered_files:
