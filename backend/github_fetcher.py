@@ -19,7 +19,7 @@ IGNORED_EXTENSIONS = {
 }
 
 MAX_FILE_SIZE = 100_000
-MAX_TOTAL_CHARS = 200_000
+MAX_TOTAL_CHARS = 100_000
 
 
 def get_headers() -> dict:

@@ -200,30 +200,19 @@ async def analyze_stream(request: AnalyzeRequest):
 
         yield f"data: {json.dumps({'status': 'analyzing', 'repo': repo_data['repo_info']['full_name']})}\n\n"
 
-        from gemini_analyzer import get_client, format_file_contents
+        from gemini_analyzer import get_openrouter_client, get_litellm_client, build_prompt, MODEL_NAME, LITELLM_MODEL, LITELLM_API_KEY
         from prompts import ANALYSIS_PROMPTS as prompts
 
-        client = get_client()
-        model_name = os.getenv("MODEL_NAME", "google/gemini-2.5-flash-preview")
-        prompt_template = prompts[request.analysis_type]
-        formatted_files = format_file_contents(repo_data["file_contents"])
-        readme_content = repo_data["file_contents"].get("README.md", "No README found.")
-
-        if request.analysis_type == "readme_improve":
-            prompt = prompt_template.format(
-                repo_name=repo_data["repo_info"]["full_name"],
-                readme_content=readme_content,
-                file_contents=formatted_files
-            )
-        else:
-            prompt = prompt_template.format(
-                repo_name=repo_data["repo_info"]["full_name"],
-                file_contents=formatted_files
-            )
+        prompt = build_prompt(
+            repo_data["repo_info"]["full_name"],
+            repo_data["file_contents"],
+            request.analysis_type
+        )
 
         try:
+            client = get_openrouter_client()
             stream = await client.chat.completions.create(
-                model=model_name,
+                model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=8192,
@@ -234,9 +223,23 @@ async def analyze_stream(request: AnalyzeRequest):
                     yield f"data: {json.dumps({'chunk': chunk.choices[0].delta.content})}\n\n"
             yield f"data: {json.dumps({'status': 'done'})}\n\n"
         except Exception as e:
-            err_str = str(e)
-            if "402" in err_str or "tokens" in err_str.lower() or "limit" in err_str.lower():
-                yield f"data: {json.dumps({'error': 'Repository is too large for the AI model. Try a smaller repository or fewer files.'})}\n\n"
+            err_str = str(e).lower()
+            if LITELLM_API_KEY and ("402" in err_str or "429" in err_str or "tokens" in err_str or "limit" in err_str or "quota" in err_str):
+                try:
+                    client = get_litellm_client()
+                    stream = await client.chat.completions.create(
+                        model=LITELLM_MODEL,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.3,
+                        max_tokens=8192,
+                        stream=True,
+                    )
+                    async for chunk in stream:
+                        if chunk.choices and chunk.choices[0].delta.content:
+                            yield f"data: {json.dumps({'chunk': chunk.choices[0].delta.content})}\n\n"
+                    yield f"data: {json.dumps({'status': 'done'})}\n\n"
+                except Exception as e2:
+                    yield f"data: {json.dumps({'error': str(e2)})}\n\n"
             else:
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
