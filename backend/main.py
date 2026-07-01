@@ -215,7 +215,7 @@ async def analyze_stream(request: AnalyzeRequest):
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
-                max_tokens=8192,
+                max_tokens=4096,
                 stream=True,
             )
             async for chunk in stream:
@@ -231,7 +231,7 @@ async def analyze_stream(request: AnalyzeRequest):
                         model=LITELLM_MODEL,
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.3,
-                        max_tokens=8192,
+                        max_tokens=4096,
                         stream=True,
                     )
                     async for chunk in stream:

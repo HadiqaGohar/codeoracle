@@ -58,7 +58,7 @@ async def call_openrouter(prompt: str) -> str:
         model=MODEL_NAME,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
-        max_tokens=8192,
+        max_tokens=4096,
     )
     if response.choices and response.choices[0].message.content:
         return response.choices[0].message.content
@@ -71,7 +71,7 @@ async def call_litellm(prompt: str) -> str:
         model=LITELLM_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
-        max_tokens=8192,
+        max_tokens=4096,
     )
     if response.choices and response.choices[0].message.content:
         return response.choices[0].message.content
