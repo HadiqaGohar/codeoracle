@@ -43,11 +43,6 @@ export default function Footer() {
                   GitHub
                 </a>
               </li>
-              <li>
-                <a href="https://hadiqa-gohar.vercel.app" target="_blank" rel="noopener noreferrer" className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">
-                  Portfolio
-                </a>
-              </li>
             </ul>
           </div>
         </div>
