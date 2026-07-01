@@ -48,18 +48,12 @@ export default function Header() {
           <Link href="/#pricing" className="text-sm text-zinc-400 hover:text-white transition-colors">
             Pricing
           </Link>
-          <button
-            onClick={() => document.getElementById("chatbot-faq")?.click()}
-            className="text-sm text-zinc-400 hover:text-white transition-colors cursor-pointer"
-          >
+          <Link href="/faq" className="text-sm text-zinc-400 hover:text-white transition-colors">
             FAQ
-          </button>
-          <button
-            onClick={() => document.getElementById("chatbot-about")?.click()}
-            className="text-sm text-zinc-400 hover:text-white transition-colors cursor-pointer"
-          >
+          </Link>
+          <Link href="/about" className="text-sm text-zinc-400 hover:text-white transition-colors">
             About
-          </button>
+          </Link>
         </nav>
 
         <div className="flex items-center gap-3">
@@ -126,24 +120,20 @@ export default function Header() {
             >
               Pricing
             </Link>
-            <button
-              onClick={() => {
-                setMobileOpen(false);
-                setTimeout(() => document.getElementById("chatbot-faq")?.click(), 100);
-              }}
-              className="text-sm text-zinc-400 hover:text-white transition-colors py-2 text-left"
+            <Link
+              href="/faq"
+              onClick={() => setMobileOpen(false)}
+              className="text-sm text-zinc-400 hover:text-white transition-colors py-2"
             >
               FAQ
-            </button>
-            <button
-              onClick={() => {
-                setMobileOpen(false);
-                setTimeout(() => document.getElementById("chatbot-about")?.click(), 100);
-              }}
-              className="text-sm text-zinc-400 hover:text-white transition-colors py-2 text-left"
+            </Link>
+            <Link
+              href="/about"
+              onClick={() => setMobileOpen(false)}
+              className="text-sm text-zinc-400 hover:text-white transition-colors py-2"
             >
               About
-            </button>
+            </Link>
             <hr className="border-zinc-800" />
             {isLoggedIn ? (
               <>
