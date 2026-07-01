@@ -42,9 +42,19 @@ function loadFromStorage(url: string): { results: Record<AnalysisType, string>; 
       localStorage.removeItem(getStorageKey(url));
       return null;
     }
+    const results = data.results || {};
+    const completed = new Set<string>(data.completed || []);
+    const cleanResults: Record<string, string> = {};
+    const cleanCompleted = new Set<string>();
+    for (const [key, val] of Object.entries(results)) {
+      if (typeof val === "string" && !val.startsWith("**Error:**")) {
+        cleanResults[key] = val;
+        cleanCompleted.add(key);
+      }
+    }
     return {
-      results: data.results || {},
-      completed: new Set(data.completed || []),
+      results: cleanResults as Record<AnalysisType, string>,
+      completed: cleanCompleted as Set<AnalysisType>,
     };
   } catch {
     return null;
