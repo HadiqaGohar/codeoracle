@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ClientLayout from "@/components/ClientLayout";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import AuthProvider from "@/components/AuthProvider";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import "./globals.css";
@@ -97,13 +98,15 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
       <body className="min-h-full flex flex-col bg-black text-zinc-100">
-        <ThemeProvider>
-          <ClientLayout>
-            <Header />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </ClientLayout>
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <ClientLayout>
+              <Header />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </ClientLayout>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

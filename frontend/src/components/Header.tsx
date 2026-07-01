@@ -2,11 +2,18 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { GitBranch, Menu, X } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
+import { GitBranch, Menu, X, User, LogOut } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { data: session, status } = useSession();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (mobileOpen) {
@@ -16,6 +23,8 @@ export default function Header() {
     }
     return () => { document.body.style.overflow = ""; };
   }, [mobileOpen]);
+
+  const isLoggedIn = mounted && !!session?.user;
 
   return (
     <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-50">
@@ -43,15 +52,42 @@ export default function Header() {
 
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <button className="hidden sm:block px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white transition-colors">
-            Sign In
-          </button>
-          <Link
-            href="/"
-            className="hidden sm:block px-4 py-2 text-sm font-medium bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-lg hover:from-violet-500 hover:to-indigo-500 transition-all"
-          >
-            Get Started
-          </Link>
+          {status === "loading" ? (
+            <div className="w-8 h-8 rounded-full bg-zinc-800 animate-pulse" />
+          ) : isLoggedIn ? (
+            <div className="hidden sm:flex items-center gap-2">
+              <Link
+                href="/profile"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+              >
+                {session?.user?.image ? (
+                  <img
+                    src={session.user.image}
+                    alt={session.user.name || ""}
+                    className="w-6 h-6 rounded-full"
+                  />
+                ) : (
+                  <User className="w-4 h-4" />
+                )}
+                <span className="max-w-[100px] truncate">{session?.user?.name || "Profile"}</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="hidden sm:flex items-center gap-2">
+              <Link
+                href="/auth/signin"
+                className="px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/auth/signin"
+                className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-lg hover:from-violet-500 hover:to-indigo-500 transition-all"
+              >
+                Get Started
+              </Link>
+            </div>
+          )}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             className="md:hidden p-2 text-zinc-400 hover:text-white transition-colors"
@@ -79,16 +115,45 @@ export default function Header() {
               Pricing
             </Link>
             <hr className="border-zinc-800" />
-            <button className="text-sm text-zinc-400 hover:text-white transition-colors py-2 text-left">
-              Sign In
-            </button>
-            <Link
-              href="/"
-              onClick={() => setMobileOpen(false)}
-              className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-lg text-center"
-            >
-              Get Started
-            </Link>
+            {isLoggedIn ? (
+              <>
+                <Link
+                  href="/profile"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors py-2"
+                >
+                  <User className="w-4 h-4" />
+                  Profile
+                </Link>
+                <button
+                  onClick={() => {
+                    setMobileOpen(false);
+                    signOut({ callbackUrl: "/" });
+                  }}
+                  className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors py-2 text-left"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/auth/signin"
+                  onClick={() => setMobileOpen(false)}
+                  className="text-sm text-zinc-400 hover:text-white transition-colors py-2"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/auth/signin"
+                  onClick={() => setMobileOpen(false)}
+                  className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-lg text-center"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}
