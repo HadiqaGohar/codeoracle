@@ -1,10 +1,12 @@
 import os
 import hashlib
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from typing import List
 
 from github_fetcher import fetch_repository
 from gemini_analyzer import analyze_code
@@ -17,7 +19,7 @@ load_dotenv()
 app = FastAPI(
     title="AI Repository Analyzer API",
     description="Analyze GitHub repositories using Google Gemini AI",
-    version="1.1.0"
+    version="1.2.0"
 )
 
 app.add_middleware(
@@ -39,6 +41,11 @@ class AnalyzeRequest(BaseModel):
     analysis_type: str
 
 
+class BatchAnalyzeRequest(BaseModel):
+    repo_url: str
+    analysis_types: List[str]
+
+
 def make_repo_key(repo_url: str) -> str:
     normalized = repo_url.strip().lower().rstrip("/")
     return cache_key("repo", hashlib.md5(normalized.encode()).hexdigest())
@@ -55,6 +62,7 @@ async def health_check():
     github_token = os.getenv("GITHUB_TOKEN", "")
     return {
         "status": "ok",
+        "version": "1.2.0",
         "gemini_configured": bool(gemini_key and gemini_key != "your_gemini_api_key_here"),
         "github_configured": bool(github_token and github_token != "your_github_token_here"),
         "available_analyses": list(ANALYSIS_TYPES.keys())
@@ -117,6 +125,59 @@ async def analyze(request: AnalyzeRequest):
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
+@app.post("/api/analyze-batch")
+async def analyze_batch(request: BatchAnalyzeRequest):
+    invalid = [t for t in request.analysis_types if t not in ANALYSIS_PROMPTS]
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid analysis types: {invalid}. Valid types: {list(ANALYSIS_PROMPTS.keys())}"
+        )
+
+    try:
+        repo_key = make_repo_key(request.repo_url)
+        repo_data = get_cache(repo_key)
+        if not repo_data:
+            repo_data = await fetch_repository(request.repo_url)
+            set_cache(repo_key, repo_data)
+
+        async def run_one(analysis_type: str):
+            a_key = make_analysis_key(request.repo_url, analysis_type)
+            cached = get_cache(a_key)
+            if cached:
+                return cached
+
+            result = await analyze_code(
+                repo_name=repo_data["repo_info"]["full_name"],
+                file_contents=repo_data["file_contents"],
+                analysis_type=analysis_type
+            )
+            response = {
+                "result": result,
+                "type": analysis_type,
+                "type_label": ANALYSIS_TYPES[analysis_type],
+            }
+            set_cache(a_key, response)
+            return response
+
+        CONCURRENCY = 3
+        results = []
+        for i in range(0, len(request.analysis_types), CONCURRENCY):
+            batch = request.analysis_types[i:i + CONCURRENCY]
+            batch_results = await asyncio.gather(*[run_one(t) for t in batch])
+            results.extend(batch_results)
+
+        return {
+            "repo_info": repo_data["repo_info"],
+            "results": results,
+            "total": len(results),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch analysis failed: {str(e)}")
+
+
 @app.post("/api/analyze-stream")
 async def analyze_stream(request: AnalyzeRequest):
     if request.analysis_type not in ANALYSIS_PROMPTS:
@@ -126,7 +187,6 @@ async def analyze_stream(request: AnalyzeRequest):
         )
 
     async def event_generator():
-        import asyncio
         import json
 
         repo_key = make_repo_key(request.repo_url)
