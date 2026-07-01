@@ -16,6 +16,7 @@ import { saveToHistory } from "@/components/HistoryPanel";
 import { AlertCircle, ArrowLeft, Keyboard } from "lucide-react";
 import ShortcutsModal from "@/components/ShortcutsModal";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import ErrorCard from "@/components/ErrorCard";
 
 const STORAGE_PREFIX = "repo-analysis-";
 
@@ -275,19 +276,22 @@ function AnalyzeContent() {
 
         {error && !repoData && (
           <div className="flex-1 flex flex-col items-center justify-center px-4">
-            <div className="bg-red-900/20 border border-red-800/50 rounded-xl p-6 max-w-md text-center">
-              <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-              <h2 className="text-white font-semibold mb-2">Error</h2>
-              <p className="text-zinc-400 text-sm mb-4">{error}</p>
-              <button
-                onClick={() => {
+            <div className="max-w-md w-full">
+              <ErrorCard
+                message={error}
+                type={
+                  error.includes("rate") || error.includes("429")
+                    ? "rate-limit"
+                    : error.includes("network") || error.includes("fetch")
+                      ? "network"
+                      : "error"
+                }
+                onRetry={() => {
                   setError(null);
-                  router.push("/");
+                  if (repoUrl) loadRepo(repoUrl);
                 }}
-                className="px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors text-sm"
-              >
-                Try Again
-              </button>
+                retryLabel="Try Again"
+              />
             </div>
           </div>
         )}
