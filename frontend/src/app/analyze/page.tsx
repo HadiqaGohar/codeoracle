@@ -9,7 +9,7 @@ import AnalysisTabs from "@/components/AnalysisTabs";
 import AnalysisResult from "@/components/AnalysisResult";
 import FileTree from "@/components/FileTree";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import { fetchRepo, analyzeCode } from "@/lib/api";
+import { fetchRepo, analyzeCodeStream } from "@/lib/api";
 import { FetchRepoResponse, AnalysisType, ANALYSIS_LABELS } from "@/types";
 import { AlertCircle, ArrowLeft } from "lucide-react";
 
@@ -25,6 +25,8 @@ function AnalyzeContent() {
   const [completedAnalyses, setCompletedAnalyses] = useState<Set<AnalysisType>>(new Set());
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState<AnalysisType | null>(null);
+  const [streamingContent, setStreamingContent] = useState("");
+  const [streamStatus, setStreamStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   const loadRepo = useCallback(async (url: string) => {
@@ -51,16 +53,38 @@ function AnalyzeContent() {
     if (!repoUrl) return;
     setAnalyzing(type);
     setActiveTab(type);
+    setStreamingContent("");
+    setStreamStatus("");
+
     try {
-      const res = await analyzeCode(repoUrl, type);
-      setResults((prev) => ({ ...prev, [type]: res.result }));
-      setCompletedAnalyses((prev) => new Set(prev).add(type));
+      await analyzeCodeStream(
+        repoUrl,
+        type,
+        (chunk) => {
+          setStreamingContent((prev) => prev + chunk);
+        },
+        (status) => {
+          setStreamStatus(status);
+        },
+        (err) => {
+          setResults((prev) => ({
+            ...prev,
+            [type]: `**Error:** ${err}`,
+          }));
+          setAnalyzing(null);
+        },
+        () => {
+          setResults((prev) => ({ ...prev, [type]: streamingContent }));
+          setCompletedAnalyses((prev) => new Set(prev).add(type));
+          setAnalyzing(null);
+          setStreamStatus("");
+        }
+      );
     } catch (err: unknown) {
       setResults((prev) => ({
         ...prev,
         [type]: `**Error:** ${err instanceof Error ? err.message : "Analysis failed"}`,
       }));
-    } finally {
       setAnalyzing(null);
     }
   };
@@ -77,8 +101,16 @@ function AnalyzeContent() {
     setRepoData(null);
     setResults({} as Record<AnalysisType, string>);
     setCompletedAnalyses(new Set());
+    setStreamingContent("");
+    setStreamStatus("");
     setError(null);
     router.push(`/analyze?url=${encodeURIComponent(url)}`);
+  };
+
+  const getStatusMessage = () => {
+    if (streamStatus === "fetching_repo") return "Fetching repository files...";
+    if (streamStatus === "analyzing") return "AI is analyzing your code...";
+    return `Running ${ANALYSIS_LABELS[activeTab]} analysis...`;
   };
 
   return (
@@ -151,11 +183,24 @@ function AnalyzeContent() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-6">
-                    <h2 className="text-xl font-bold text-white mb-4">
-                      {ANALYSIS_LABELS[activeTab]}
-                    </h2>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-bold text-white">
+                        {ANALYSIS_LABELS[activeTab]}
+                      </h2>
+                      {analyzing && (
+                        <span className="text-xs text-violet-400 animate-pulse">
+                          Streaming...
+                        </span>
+                      )}
+                    </div>
                     {analyzing === activeTab ? (
-                      <LoadingSpinner message={`Running ${ANALYSIS_LABELS[activeTab]} analysis...`} />
+                      <div>
+                        {streamingContent ? (
+                          <AnalysisResult content={streamingContent} />
+                        ) : (
+                          <LoadingSpinner message={getStatusMessage()} />
+                        )}
+                      </div>
                     ) : results[activeTab] ? (
                       <AnalysisResult content={results[activeTab]} />
                     ) : (

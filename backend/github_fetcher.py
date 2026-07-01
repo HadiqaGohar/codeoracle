@@ -1,5 +1,6 @@
 import httpx
 import os
+import asyncio
 from typing import Optional
 
 GITHUB_API = "https://api.github.com"
@@ -110,6 +111,26 @@ async def fetch_repo_info(owner: str, repo: str) -> dict:
         }
 
 
+async def fetch_file_content_shared(client: httpx.AsyncClient, owner: str, repo: str, path: str) -> Optional[str]:
+    try:
+        resp = await client.get(
+            f"{GITHUB_API}/repos/{owner}/{repo}/contents/{path}",
+            headers=get_headers()
+        )
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        if data.get("encoding") == "base64":
+            import base64
+            try:
+                return base64.b64decode(data["content"]).decode("utf-8", errors="ignore")
+            except Exception:
+                return None
+        return None
+    except Exception:
+        return None
+
+
 async def fetch_repository(repo_url: str) -> dict:
     owner, repo = parse_repo_url(repo_url)
 
@@ -123,16 +144,25 @@ async def fetch_repository(repo_url: str) -> dict:
         if should_include_file(item["path"])
     ]
 
-    filtered_files.sort(key=lambda x: x["size"] if "size" in x else 0)
+    filtered_files.sort(key=lambda x: x.get("size", 0), reverse=True)
 
     files_to_fetch = filtered_files[:50]
 
-    file_contents = {}
-    for file_item in files_to_fetch:
+    semaphore = asyncio.Semaphore(10)
+
+    async def fetch_with_semaphore(client: httpx.AsyncClient, file_item: dict) -> tuple[str, Optional[str]]:
         path = file_item["path"]
-        content = await fetch_file_content(owner, repo, path)
-        if content and len(content) < MAX_FILE_SIZE:
-            file_contents[path] = content
+        async with semaphore:
+            content = await fetch_file_content_shared(client, owner, repo, path)
+            return path, content
+
+    file_contents = {}
+    async with httpx.AsyncClient(timeout=30) as client:
+        tasks = [fetch_with_semaphore(client, fi) for fi in files_to_fetch]
+        results = await asyncio.gather(*tasks)
+        for path, content in results:
+            if content and len(content) < MAX_FILE_SIZE:
+                file_contents[path] = content
 
     file_tree = []
     for item in filtered_files:
