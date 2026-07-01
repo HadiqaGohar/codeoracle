@@ -3,6 +3,17 @@
 :root {
   --background: #000000;
   --foreground: #ededed;
+  --card-bg: rgba(24, 24, 27, 0.5);
+  --card-border: #27272a;
+  --muted: #71717a;
+}
+
+.light {
+  --background: #ffffff;
+  --foreground: #18181b;
+  --card-bg: rgba(244, 244, 245, 0.8);
+  --card-border: #e4e4e7;
+  --muted: #a1a1aa;
 }
 
 @theme inline {
@@ -16,7 +27,29 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s, color 0.2s;
 }
+
+.light .bg-black { background-color: #ffffff; }
+.light .bg-zinc-950\/80 { background-color: rgba(255, 255, 255, 0.8); }
+.light .bg-zinc-900\/50 { background-color: rgba(244, 244, 245, 0.8); }
+.light .bg-zinc-900\/30 { background-color: rgba(244, 244, 245, 0.6); }
+.light .bg-zinc-800\/50 { background-color: rgba(228, 228, 231, 0.6); }
+.light .bg-zinc-800 { background-color: #e4e4e7; }
+.light .bg-zinc-900 { background-color: #f4f4f5; }
+.light .border-zinc-800 { border-color: #e4e4e7; }
+.light .border-zinc-700 { border-color: #d4d4d8; }
+.light .text-white { color: #18181b; }
+.light .text-zinc-100 { color: #18181b; }
+.light .text-zinc-200 { color: #27272a; }
+.light .text-zinc-300 { color: #3f3f46; }
+.light .text-zinc-400 { color: #52525b; }
+.light .text-zinc-500 { color: #71717a; }
+.light .text-zinc-600 { color: #a1a1aa; }
+.light .hover\:bg-zinc-800:hover { background-color: #d4d4d8; }
+.light .hover\:bg-zinc-700:hover { background-color: #c4c4c7; }
+.light .hover\:text-white:hover { color: #18181b; }
+.light .hover\:border-zinc-700:hover { border-color: #a1a1aa; }
 
 ::-webkit-scrollbar {
   width: 6px;

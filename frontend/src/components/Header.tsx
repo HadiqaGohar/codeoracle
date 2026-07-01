@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { GitBranch } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Header() {
   return (
@@ -16,7 +17,8 @@ export default function Header() {
             <p className="text-[10px] text-zinc-500 leading-tight">Powered by Gemini AI</p>
           </div>
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
           <a
             href="https://github.com"
             target="_blank"
