@@ -1,4 +1,4 @@
-import { FetchRepoResponse, AnalyzeResponse, HealthResponse, AnalysisType } from "@/types";
+import { FetchRepoResponse, AnalyzeResponse, BatchAnalyzeResponse, HealthResponse, AnalysisType } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -83,6 +83,22 @@ export async function analyzeCodeStream(
       }
     }
   }
+}
+
+export async function analyzeBatch(
+  repoUrl: string,
+  analysisTypes: AnalysisType[]
+): Promise<BatchAnalyzeResponse> {
+  const res = await fetch(`${API_URL}/api/analyze-batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repo_url: repoUrl, analysis_types: analysisTypes }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Batch analysis failed");
+  }
+  return res.json();
 }
 
 export async function checkHealth(): Promise<HealthResponse> {

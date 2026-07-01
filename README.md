@@ -63,7 +63,21 @@ docker compose up --build
 |----------|--------|-------------|
 | `/api/health` | GET | Health check |
 | `/api/fetch-repo` | POST | Fetch GitHub repo |
-| `/api/analyze` | POST | Run AI analysis |
+| `/api/analyze` | POST | Run single AI analysis |
+| `/api/analyze-stream` | POST | Run analysis with SSE streaming |
+| `/api/analyze-batch` | POST | Run multiple analyses concurrently |
+| `/api/cache/clear` | POST | Clear server cache |
+
+## Testing
+
+### Backend Tests
+
+```bash
+cd backend
+source venv/bin/activate
+pip install pytest pytest-asyncio
+python -m pytest tests/ -v
+```
 
 ## License
 

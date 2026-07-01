@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import RepoInput from "@/components/RepoInput";
 import HistoryPanel from "@/components/HistoryPanel";
 import Pricing from "@/components/Pricing";
+import ExampleAnalyses from "@/components/ExampleAnalyses";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import {
   Code,
@@ -179,6 +180,9 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* Example Analyses */}
+        <ExampleAnalyses />
 
         {/* CTA Section */}
         <section className="py-20 px-4">

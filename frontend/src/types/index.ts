@@ -33,6 +33,18 @@ export interface AnalyzeResponse {
   repo_info: RepoInfo;
 }
 
+export interface BatchAnalyzeResult {
+  result: string;
+  type: string;
+  type_label: string;
+}
+
+export interface BatchAnalyzeResponse {
+  repo_info: RepoInfo;
+  results: BatchAnalyzeResult[];
+  total: number;
+}
+
 export interface HealthResponse {
   status: string;
   gemini_configured: boolean;

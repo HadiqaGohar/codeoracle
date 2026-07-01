@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense, useMemo } from "react";
+import { useState, useEffect, useCallback, Suspense, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import RepoInput from "@/components/RepoInput";
 import RepoInfoCard from "@/components/RepoInfoCard";
@@ -8,7 +8,7 @@ import AnalysisTabs from "@/components/AnalysisTabs";
 import AnalysisResult from "@/components/AnalysisResult";
 import FileTree from "@/components/FileTree";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import { fetchRepo, analyzeCodeStream } from "@/lib/api";
+import { fetchRepo, analyzeCodeStream, analyzeBatch } from "@/lib/api";
 import { FetchRepoResponse, AnalysisType, ANALYSIS_LABELS } from "@/types";
 import ExportButtons from "@/components/ExportButtons";
 import MobileFileDrawer from "@/components/MobileFileDrawer";
@@ -69,6 +69,7 @@ function AnalyzeContent() {
   const [isRunningAll, setIsRunningAll] = useState(false);
   const [runAllProgress, setRunAllProgress] = useState({ done: 0, total: 0 });
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const streamingContentRef = useRef("");
 
   const allTabs: AnalysisType[] = [
     "code_explain", "bug_detection", "readme_improve",
@@ -134,12 +135,14 @@ function AnalyzeContent() {
     setActiveTab(type);
     setStreamingContent("");
     setStreamStatus("");
+    streamingContentRef.current = "";
 
     try {
       await analyzeCodeStream(
         repoUrl,
         type,
         (chunk) => {
+          streamingContentRef.current += chunk;
           setStreamingContent((prev) => prev + chunk);
         },
         (status) => {
@@ -153,7 +156,7 @@ function AnalyzeContent() {
           setAnalyzing(null);
         },
         () => {
-          setResults((prev) => ({ ...prev, [type]: streamingContent }));
+          setResults((prev) => ({ ...prev, [type]: streamingContentRef.current }));
           setCompletedAnalyses((prev) => {
             const next = new Set(prev).add(type);
             if (repoData?.repo_info) {
@@ -193,47 +196,33 @@ function AnalyzeContent() {
     const pending = allTypes.filter((t) => !results[t]);
     setRunAllProgress({ done: 0, total: pending.length });
 
-    const CONCURRENCY = 3;
-    let completedCount = 0;
+    try {
+      const batchResponse = await analyzeBatch(repoUrl, pending);
+      
+      const newResults = { ...results };
+      for (const item of batchResponse.results) {
+        const type = item.type as AnalysisType;
+        newResults[type] = item.result;
+      }
+      setResults(newResults);
 
-    const runSingle = async (type: AnalysisType) => {
-      return new Promise<void>((resolve) => {
-        let content = "";
-        analyzeCodeStream(
-          repoUrl,
-          type,
-          (chunk) => { content += chunk; },
-          () => {},
-          (err) => {
-            setResults((prev) => ({ ...prev, [type]: `**Error:** ${err}` }));
-            completedCount++;
-            setRunAllProgress({ done: completedCount, total: pending.length });
-            resolve();
-          },
-          () => {
-            setResults((prev) => ({ ...prev, [type]: content }));
-            setCompletedAnalyses((prev) => {
-              const next = new Set(prev).add(type);
-              if (repoData?.repo_info) {
-                saveToHistory(repoUrl, repoData.repo_info.full_name, next.size);
-              }
-              return next;
-            });
-            completedCount++;
-            setRunAllProgress({ done: completedCount, total: pending.length });
-            resolve();
-          }
-        );
-      });
-    };
+      const newCompleted = new Set(completedAnalyses);
+      for (const item of batchResponse.results) {
+        newCompleted.add(item.type as AnalysisType);
+      }
+      setCompletedAnalyses(newCompleted);
 
-    for (let i = 0; i < pending.length; i += CONCURRENCY) {
-      const batch = pending.slice(i, i + CONCURRENCY);
-      await Promise.all(batch.map((type) => runSingle(type)));
+      if (batchResponse.repo_info) {
+        saveToHistory(repoUrl, batchResponse.repo_info.full_name, newCompleted.size);
+      }
+
+      setRunAllProgress({ done: pending.length, total: pending.length });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Batch analysis failed");
+    } finally {
+      setIsRunningAll(false);
+      setRunAllProgress({ done: 0, total: 0 });
     }
-
-    setIsRunningAll(false);
-    setRunAllProgress({ done: 0, total: 0 });
   };
 
   const handleNewRepo = (url: string) => {
