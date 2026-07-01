@@ -64,6 +64,7 @@ function AnalyzeContent() {
   const [error, setError] = useState<string | null>(null);
   const [restoredFromCache, setRestoredFromCache] = useState(false);
   const [isRunningAll, setIsRunningAll] = useState(false);
+  const [runAllProgress, setRunAllProgress] = useState({ done: 0, total: 0 });
 
   const loadRepo = useCallback(async (url: string) => {
     if (!url) return;
@@ -160,51 +161,50 @@ function AnalyzeContent() {
       "architecture", "documentation", "refactoring", "security"
     ];
 
-    for (const type of allTypes) {
-      if (!results[type]) {
-        setActiveTab(type);
-        await new Promise<void>((resolve) => {
-          const runAnalysis = async () => {
-            setAnalyzing(type);
-            setStreamingContent("");
-            setStreamStatus("");
-            let content = "";
-            try {
-              await analyzeCodeStream(
-                repoUrl,
-                type,
-                (chunk) => { content += chunk; setStreamingContent(content); },
-                (status) => { setStreamStatus(status); },
-                (err) => {
-                  setResults((prev) => ({ ...prev, [type]: `**Error:** ${err}` }));
-                  setAnalyzing(null);
-                  resolve();
-                },
-                () => {
-                  setResults((prev) => ({ ...prev, [type]: content }));
-                  setCompletedAnalyses((prev) => {
-                    const next = new Set(prev).add(type);
-                    if (repoData?.repo_info) {
-                      saveToHistory(repoUrl, repoData.repo_info.full_name, next.size);
-                    }
-                    return next;
-                  });
-                  setAnalyzing(null);
-                  setStreamStatus("");
-                  resolve();
-                }
-              );
-            } catch {
-              setResults((prev) => ({ ...prev, [type]: "**Error:** Analysis failed" }));
-              setAnalyzing(null);
-              resolve();
-            }
-          };
-          runAnalysis();
-        });
-      }
+    const pending = allTypes.filter((t) => !results[t]);
+    setRunAllProgress({ done: 0, total: pending.length });
+
+    const CONCURRENCY = 3;
+    let completedCount = 0;
+
+    const runSingle = async (type: AnalysisType) => {
+      return new Promise<void>((resolve) => {
+        let content = "";
+        analyzeCodeStream(
+          repoUrl,
+          type,
+          (chunk) => { content += chunk; },
+          () => {},
+          (err) => {
+            setResults((prev) => ({ ...prev, [type]: `**Error:** ${err}` }));
+            completedCount++;
+            setRunAllProgress({ done: completedCount, total: pending.length });
+            resolve();
+          },
+          () => {
+            setResults((prev) => ({ ...prev, [type]: content }));
+            setCompletedAnalyses((prev) => {
+              const next = new Set(prev).add(type);
+              if (repoData?.repo_info) {
+                saveToHistory(repoUrl, repoData.repo_info.full_name, next.size);
+              }
+              return next;
+            });
+            completedCount++;
+            setRunAllProgress({ done: completedCount, total: pending.length });
+            resolve();
+          }
+        );
+      });
+    };
+
+    for (let i = 0; i < pending.length; i += CONCURRENCY) {
+      const batch = pending.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map((type) => runSingle(type)));
     }
+
     setIsRunningAll(false);
+    setRunAllProgress({ done: 0, total: 0 });
   };
 
   const handleNewRepo = (url: string) => {
@@ -288,6 +288,19 @@ function AnalyzeContent() {
                     completedAnalyses={completedAnalyses}
                     isRunningAll={isRunningAll}
                   />
+                  {isRunningAll && runAllProgress.total > 0 && (
+                    <div className="mt-3 flex items-center gap-3">
+                      <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-violet-600 to-indigo-600 transition-all duration-300"
+                          style={{ width: `${(runAllProgress.done / runAllProgress.total) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-zinc-400 whitespace-nowrap">
+                        {runAllProgress.done}/{runAllProgress.total} completed
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
