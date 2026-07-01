@@ -9,6 +9,8 @@ import {
   BookOpen,
   Wrench,
   Shield,
+  Play,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,13 +27,17 @@ const ICONS: Record<AnalysisType, React.ElementType> = {
 interface AnalysisTabsProps {
   activeTab: AnalysisType;
   onTabChange: (type: AnalysisType) => void;
+  onRunAll?: () => void;
   completedAnalyses: Set<AnalysisType>;
+  isRunningAll?: boolean;
 }
 
 export default function AnalysisTabs({
   activeTab,
   onTabChange,
+  onRunAll,
   completedAnalyses,
+  isRunningAll,
 }: AnalysisTabsProps) {
   const tabs: AnalysisType[] = [
     "code_explain",
@@ -43,8 +49,10 @@ export default function AnalysisTabs({
     "security",
   ];
 
+  const allCompleted = tabs.every((t) => completedAnalyses.has(t));
+
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {tabs.map((tab) => {
         const Icon = ICONS[tab];
         const isActive = activeTab === tab;
@@ -54,12 +62,14 @@ export default function AnalysisTabs({
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
+            disabled={isRunningAll}
             className={cn(
               "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all",
               isActive
                 ? "bg-violet-600 text-white shadow-lg shadow-violet-600/25"
                 : "bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
-              isCompleted && !isActive && "bg-emerald-900/30 text-emerald-400 border border-emerald-800/50"
+              isCompleted && !isActive && "bg-emerald-900/30 text-emerald-400 border border-emerald-800/50",
+              isRunningAll && "opacity-50 cursor-not-allowed"
             )}
           >
             <Icon className="w-4 h-4" />
@@ -71,6 +81,30 @@ export default function AnalysisTabs({
           </button>
         );
       })}
+
+      {onRunAll && (
+        <button
+          onClick={onRunAll}
+          disabled={isRunningAll || allCompleted}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ml-2",
+            isRunningAll
+              ? "bg-violet-600/50 text-white cursor-wait"
+              : allCompleted
+                ? "bg-emerald-900/30 text-emerald-400 border border-emerald-800/50 cursor-not-allowed"
+                : "bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-violet-600/25"
+          )}
+        >
+          {isRunningAll ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : allCompleted ? (
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          ) : (
+            <Play className="w-4 h-4" />
+          )}
+          {isRunningAll ? "Running All..." : allCompleted ? "All Done" : "Run All"}
+        </button>
+      )}
     </div>
   );
 }

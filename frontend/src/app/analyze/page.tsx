@@ -62,6 +62,7 @@ function AnalyzeContent() {
   const [streamStatus, setStreamStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [restoredFromCache, setRestoredFromCache] = useState(false);
+  const [isRunningAll, setIsRunningAll] = useState(false);
 
   const loadRepo = useCallback(async (url: string) => {
     if (!url) return;
@@ -143,6 +144,56 @@ function AnalyzeContent() {
     }
   };
 
+  const handleRunAll = async () => {
+    if (!repoUrl || isRunningAll) return;
+    setIsRunningAll(true);
+
+    const allTypes: AnalysisType[] = [
+      "code_explain", "bug_detection", "readme_improve",
+      "architecture", "documentation", "refactoring", "security"
+    ];
+
+    for (const type of allTypes) {
+      if (!results[type]) {
+        setActiveTab(type);
+        await new Promise<void>((resolve) => {
+          const runAnalysis = async () => {
+            setAnalyzing(type);
+            setStreamingContent("");
+            setStreamStatus("");
+            let content = "";
+            try {
+              await analyzeCodeStream(
+                repoUrl,
+                type,
+                (chunk) => { content += chunk; setStreamingContent(content); },
+                (status) => { setStreamStatus(status); },
+                (err) => {
+                  setResults((prev) => ({ ...prev, [type]: `**Error:** ${err}` }));
+                  setAnalyzing(null);
+                  resolve();
+                },
+                () => {
+                  setResults((prev) => ({ ...prev, [type]: content }));
+                  setCompletedAnalyses((prev) => new Set(prev).add(type));
+                  setAnalyzing(null);
+                  setStreamStatus("");
+                  resolve();
+                }
+              );
+            } catch {
+              setResults((prev) => ({ ...prev, [type]: "**Error:** Analysis failed" }));
+              setAnalyzing(null);
+              resolve();
+            }
+          };
+          runAnalysis();
+        });
+      }
+    }
+    setIsRunningAll(false);
+  };
+
   const handleNewRepo = (url: string) => {
     setRepoUrl(url);
     setRepoData(null);
@@ -221,7 +272,9 @@ function AnalyzeContent() {
                   <AnalysisTabs
                     activeTab={activeTab}
                     onTabChange={handleTabChange}
+                    onRunAll={handleRunAll}
                     completedAnalyses={completedAnalyses}
+                    isRunningAll={isRunningAll}
                   />
                 </div>
               </div>
