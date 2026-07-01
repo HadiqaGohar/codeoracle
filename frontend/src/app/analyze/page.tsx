@@ -12,6 +12,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { fetchRepo, analyzeCodeStream } from "@/lib/api";
 import { FetchRepoResponse, AnalysisType, ANALYSIS_LABELS } from "@/types";
 import ExportButtons from "@/components/ExportButtons";
+import { saveToHistory } from "@/components/HistoryPanel";
 import { AlertCircle, ArrowLeft } from "lucide-react";
 
 const STORAGE_PREFIX = "repo-analysis-";
@@ -123,7 +124,13 @@ function AnalyzeContent() {
         },
         () => {
           setResults((prev) => ({ ...prev, [type]: streamingContent }));
-          setCompletedAnalyses((prev) => new Set(prev).add(type));
+          setCompletedAnalyses((prev) => {
+            const next = new Set(prev).add(type);
+            if (repoData?.repo_info) {
+              saveToHistory(repoUrl, repoData.repo_info.full_name, next.size);
+            }
+            return next;
+          });
           setAnalyzing(null);
           setStreamStatus("");
         }
@@ -175,7 +182,13 @@ function AnalyzeContent() {
                 },
                 () => {
                   setResults((prev) => ({ ...prev, [type]: content }));
-                  setCompletedAnalyses((prev) => new Set(prev).add(type));
+                  setCompletedAnalyses((prev) => {
+                    const next = new Set(prev).add(type);
+                    if (repoData?.repo_info) {
+                      saveToHistory(repoUrl, repoData.repo_info.full_name, next.size);
+                    }
+                    return next;
+                  });
                   setAnalyzing(null);
                   setStreamStatus("");
                   resolve();

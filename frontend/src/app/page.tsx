@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import RepoInput from "@/components/RepoInput";
+import HistoryPanel from "@/components/HistoryPanel";
 import {
   Code,
   Bug,
@@ -57,7 +58,9 @@ export default function Home() {
           <RepoInput onSubmit={handleSubmit} isLoading={isLoading} />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-20 max-w-4xl w-full px-4">
+        <HistoryPanel onSelect={(url) => router.push(`/analyze?url=${encodeURIComponent(url)}`)} />
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-12 max-w-4xl w-full px-4">
           {features.map((f) => (
             <div
               key={f.label}
