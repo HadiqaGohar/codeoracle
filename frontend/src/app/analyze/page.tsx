@@ -65,6 +65,7 @@ function AnalyzeContent() {
       : "code_explain"
   );
   const [results, setResults] = useState<Record<AnalysisType, string>>({} as Record<AnalysisType, string>);
+  const [tabErrors, setTabErrors] = useState<Record<AnalysisType, { message: string; type: "error" | "network" | "rate-limit" | "timeout" } | null>>({} as Record<AnalysisType, null>);
   const [completedAnalyses, setCompletedAnalyses] = useState<Set<AnalysisType>>(new Set());
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState<AnalysisType | null>(null);
@@ -82,6 +83,22 @@ function AnalyzeContent() {
     "code_explain", "bug_detection", "readme_improve",
     "architecture", "documentation", "refactoring", "security"
   ];
+
+  const classifyError = (err: string): { message: string; type: "error" | "network" | "rate-limit" | "timeout" } => {
+    if (err.includes("429") || err.includes("quota") || err.includes("rate limit") || err.includes("RESOURCE_EXHAUSTED")) {
+      return {
+        message: "AI rate limit exceeded. Please wait a moment and try again.",
+        type: "rate-limit",
+      };
+    }
+    if (err.includes("timeout") || err.includes("TIMEOUT")) {
+      return { message: "Request timed out. The repository may be too large.", type: "timeout" };
+    }
+    if (err.includes("network") || err.includes("fetch") || err.includes("ECONNREFUSED")) {
+      return { message: "Network error. Please check your connection.", type: "network" };
+    }
+    return { message: err, type: "error" };
+  };
 
   const keyboardHandlers = useMemo(() => ({
     onFocusSearch: () => {
@@ -156,10 +173,7 @@ function AnalyzeContent() {
           setStreamStatus(status);
         },
         (err) => {
-          setResults((prev) => ({
-            ...prev,
-            [type]: `**Error:** ${err}`,
-          }));
+          setTabErrors((prev) => ({ ...prev, [type]: classifyError(err) }));
           setAnalyzing(null);
         },
         () => {
@@ -176,10 +190,8 @@ function AnalyzeContent() {
         }
       );
     } catch (err: unknown) {
-      setResults((prev) => ({
-        ...prev,
-        [type]: `**Error:** ${err instanceof Error ? err.message : "Analysis failed"}`,
-      }));
+      const msg = err instanceof Error ? err.message : "Analysis failed";
+      setTabErrors((prev) => ({ ...prev, [type]: classifyError(msg) }));
       setAnalyzing(null);
     }
   };
@@ -187,7 +199,7 @@ function AnalyzeContent() {
   const handleTabChange = (type: AnalysisType) => {
     setActiveTab(type);
     router.replace(`/analyze?url=${encodeURIComponent(repoUrl)}&tab=${type}`, { scroll: false });
-    if (!results[type] && !analyzing) {
+    if (!results[type] && !tabErrors[type] && !analyzing) {
       handleAnalyze(type);
     }
   };
@@ -237,6 +249,7 @@ function AnalyzeContent() {
     setRepoUrl(url);
     setRepoData(null);
     setResults({} as Record<AnalysisType, string>);
+    setTabErrors({} as Record<AnalysisType, null>);
     setCompletedAnalyses(new Set());
     setStreamingContent("");
     setStreamStatus("");
@@ -385,6 +398,22 @@ function AnalyzeContent() {
                         ) : (
                           <LoadingSpinner message={getStatusMessage()} />
                         )}
+                      </div>
+                    ) : tabErrors[activeTab] ? (
+                      <div ref={analysisContentRef}>
+                        <ErrorCard
+                          message={tabErrors[activeTab]!.message}
+                          type={tabErrors[activeTab]!.type}
+                          onRetry={() => {
+                            setTabErrors((prev) => ({ ...prev, [activeTab]: null }));
+                            setResults((prev) => {
+                              const next = { ...prev };
+                              delete next[activeTab];
+                              return next;
+                            });
+                            handleAnalyze(activeTab);
+                          }}
+                        />
                       </div>
                     ) : results[activeTab] ? (
                       <div ref={analysisContentRef}>
