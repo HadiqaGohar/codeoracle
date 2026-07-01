@@ -12,6 +12,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { fetchRepo, analyzeCodeStream } from "@/lib/api";
 import { FetchRepoResponse, AnalysisType, ANALYSIS_LABELS } from "@/types";
 import ExportButtons from "@/components/ExportButtons";
+import MobileFileDrawer from "@/components/MobileFileDrawer";
 import { saveToHistory } from "@/components/HistoryPanel";
 import { AlertCircle, ArrowLeft } from "lucide-react";
 
@@ -300,6 +301,7 @@ function AnalyzeContent() {
                     <FileTree files={repoData.file_tree} />
                   </div>
                 </div>
+                <MobileFileDrawer files={repoData.file_tree} />
                 <div className="flex-1 min-w-0">
                   <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-6">
                     <div className="flex items-center justify-between mb-4">
