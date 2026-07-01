@@ -10,6 +10,7 @@ from github_fetcher import fetch_repository
 from gemini_analyzer import analyze_code
 from prompts import ANALYSIS_TYPES, ANALYSIS_PROMPTS
 from cache import get_cache, set_cache, clear_cache, cache_key
+from rate_limit import RateLimitMiddleware
 
 load_dotenv()
 
@@ -26,6 +27,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RateLimitMiddleware, requests=30, window=60)
 
 
 class RepoRequest(BaseModel):
