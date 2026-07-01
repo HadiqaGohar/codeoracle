@@ -225,7 +225,8 @@ async def analyze_stream(request: AnalyzeRequest):
         )
 
         try:
-            async for chunk in model.generate_content_async(prompt, stream=True):
+            stream = await model.generate_content_async(prompt, stream=True)
+            async for chunk in stream:
                 if chunk.text:
                     yield f"data: {json.dumps({'chunk': chunk.text})}\n\n"
             yield f"data: {json.dumps({'status': 'done'})}\n\n"
