@@ -13,6 +13,38 @@ import { fetchRepo, analyzeCodeStream } from "@/lib/api";
 import { FetchRepoResponse, AnalysisType, ANALYSIS_LABELS } from "@/types";
 import { AlertCircle, ArrowLeft } from "lucide-react";
 
+const STORAGE_PREFIX = "repo-analysis-";
+
+function getStorageKey(url: string): string {
+  return STORAGE_PREFIX + btoa(url.replace(/[^a-zA-Z0-9]/g, "")).slice(0, 32);
+}
+
+function saveToStorage(url: string, results: Record<AnalysisType, string>, completed: Set<AnalysisType>) {
+  try {
+    const data = { results, completed: Array.from(completed), timestamp: Date.now() };
+    localStorage.setItem(getStorageKey(url), JSON.stringify(data));
+  } catch { /* storage full or unavailable */ }
+}
+
+function loadFromStorage(url: string): { results: Record<AnalysisType, string>; completed: Set<AnalysisType> } | null {
+  try {
+    const raw = localStorage.getItem(getStorageKey(url));
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    const age = Date.now() - (data.timestamp || 0);
+    if (age > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(getStorageKey(url));
+      return null;
+    }
+    return {
+      results: data.results || {},
+      completed: new Set(data.completed || []),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function AnalyzeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -28,6 +60,7 @@ function AnalyzeContent() {
   const [streamingContent, setStreamingContent] = useState("");
   const [streamStatus, setStreamStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [restoredFromCache, setRestoredFromCache] = useState(false);
 
   const loadRepo = useCallback(async (url: string) => {
     if (!url) return;
@@ -36,6 +69,13 @@ function AnalyzeContent() {
     try {
       const data = await fetchRepo(url);
       setRepoData(data);
+
+      const cached = loadFromStorage(url);
+      if (cached && Object.keys(cached.results).length > 0) {
+        setResults(cached.results);
+        setCompletedAnalyses(cached.completed);
+        setRestoredFromCache(true);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to fetch repository");
     } finally {
@@ -48,6 +88,12 @@ function AnalyzeContent() {
       loadRepo(urlParam);
     }
   }, [urlParam, loadRepo]);
+
+  useEffect(() => {
+    if (repoUrl && Object.keys(results).length > 0) {
+      saveToStorage(repoUrl, results, completedAnalyses);
+    }
+  }, [repoUrl, results, completedAnalyses]);
 
   const handleAnalyze = async (type: AnalysisType) => {
     if (!repoUrl) return;
@@ -104,6 +150,7 @@ function AnalyzeContent() {
     setStreamingContent("");
     setStreamStatus("");
     setError(null);
+    setRestoredFromCache(false);
     router.push(`/analyze?url=${encodeURIComponent(url)}`);
   };
 
@@ -164,6 +211,11 @@ function AnalyzeContent() {
                   New Analysis
                 </button>
                 <RepoInfoCard info={repoData.repo_info} />
+                {restoredFromCache && (
+                  <div className="mt-2 text-xs text-emerald-500">
+                    Results restored from previous session ({completedAnalyses.size} analyses cached)
+                  </div>
+                )}
                 <div className="mt-4">
                   <AnalysisTabs
                     activeTab={activeTab}
