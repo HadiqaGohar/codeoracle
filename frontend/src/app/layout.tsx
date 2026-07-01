@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ClientLayout from "@/components/ClientLayout";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -22,8 +24,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "AI Repository Analyzer | Analyze GitHub Repos with AI",
-    template: "%s | AI Repository Analyzer",
+    default: "CodeOracle | AI Repository Analyzer",
+    template: "%s | CodeOracle",
   },
   description:
     "Free AI-powered GitHub repository analyzer. Paste any repo URL and get instant code explanation, bug detection, security analysis, architecture diagrams, and more using Google Gemini AI.",
@@ -39,16 +41,16 @@ export const metadata: Metadata = {
     "code review",
     "open source",
   ],
-  authors: [{ name: "AI Repository Analyzer" }],
-  creator: "AI Repository Analyzer",
-  publisher: "AI Repository Analyzer",
+  authors: [{ name: "Hadiqa Gohar" }],
+  creator: "Hadiqa Gohar",
+  publisher: "CodeOracle",
   metadataBase: new URL("https://codeoracle.vercel.app"),
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://codeoracle.vercel.app",
-    siteName: "AI Repository Analyzer",
-    title: "AI Repository Analyzer | Analyze GitHub Repos with AI",
+    siteName: "CodeOracle",
+    title: "CodeOracle | AI Repository Analyzer",
     description:
       "Free AI-powered GitHub repository analyzer. Paste any repo URL and get instant code explanation, bug detection, security analysis, architecture diagrams, and more.",
     images: [
@@ -56,13 +58,13 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "AI Repository Analyzer",
+        alt: "CodeOracle - AI Repository Analyzer",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Repository Analyzer",
+    title: "CodeOracle | AI Repository Analyzer",
     description:
       "Free AI-powered GitHub repository analyzer. Instant code explanation, bug detection, security analysis, and more.",
     images: ["/og-image.png"],
@@ -93,11 +95,14 @@ export default function RootLayout({
     >
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="min-h-full flex flex-col bg-black text-zinc-100">
         <ThemeProvider>
-          <ClientLayout>{children}</ClientLayout>
+          <ClientLayout>
+            <Header />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </ClientLayout>
         </ThemeProvider>
       </body>
     </html>

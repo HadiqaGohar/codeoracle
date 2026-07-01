@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Header from "@/components/Header";
 import RepoInput from "@/components/RepoInput";
 import RepoInfoCard from "@/components/RepoInfoCard";
 import AnalysisTabs from "@/components/AnalysisTabs";
@@ -227,9 +226,8 @@ function AnalyzeContent() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col">
-      <Header />
-      <main className="flex-1 flex flex-col">
+    <div className="min-h-screen">
+      <main className="flex flex-col">
         {!repoData && !loading && !error && (
           <div className="flex-1 flex flex-col items-center justify-center px-4 py-20">
             <div className="text-center mb-8">
