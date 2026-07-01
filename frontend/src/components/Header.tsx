@@ -48,6 +48,18 @@ export default function Header() {
           <Link href="/#pricing" className="text-sm text-zinc-400 hover:text-white transition-colors">
             Pricing
           </Link>
+          <button
+            onClick={() => document.getElementById("chatbot-faq")?.click()}
+            className="text-sm text-zinc-400 hover:text-white transition-colors cursor-pointer"
+          >
+            FAQ
+          </button>
+          <button
+            onClick={() => document.getElementById("chatbot-about")?.click()}
+            className="text-sm text-zinc-400 hover:text-white transition-colors cursor-pointer"
+          >
+            About
+          </button>
         </nav>
 
         <div className="flex items-center gap-3">
@@ -114,6 +126,24 @@ export default function Header() {
             >
               Pricing
             </Link>
+            <button
+              onClick={() => {
+                setMobileOpen(false);
+                setTimeout(() => document.getElementById("chatbot-faq")?.click(), 100);
+              }}
+              className="text-sm text-zinc-400 hover:text-white transition-colors py-2 text-left"
+            >
+              FAQ
+            </button>
+            <button
+              onClick={() => {
+                setMobileOpen(false);
+                setTimeout(() => document.getElementById("chatbot-about")?.click(), 100);
+              }}
+              className="text-sm text-zinc-400 hover:text-white transition-colors py-2 text-left"
+            >
+              About
+            </button>
             <hr className="border-zinc-800" />
             {isLoggedIn ? (
               <>
